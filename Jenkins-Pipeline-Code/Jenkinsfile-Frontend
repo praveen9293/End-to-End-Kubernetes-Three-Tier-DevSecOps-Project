@@ -6,7 +6,7 @@ pipeline {
     environment  {
         SCANNER_HOME=tool 'sonar-scanner'
         AWS_ACCOUNT_ID = credentials('ACCOUNT_ID')
-        AWS_ECR_REPO_NAME = credentials('ECR_REPO2')
+        AWS_ECR_REPO_NAME = credentials('ECR_REPO1')
         AWS_DEFAULT_REGION = 'us-east-1'
         REPOSITORY_URI = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/"
     }
@@ -23,25 +23,25 @@ pipeline {
         }
         stage('Sonarqube Analysis') {
             steps {
-                dir('Application-Code/backend') {
+                dir('Application-Code/frontend') {
                     withSonarQubeEnv('sonar-server') {
                         sh ''' $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectName=backend \
-                        -Dsonar.projectKey=backend '''
+                        -Dsonar.projectName=frontend \
+                        -Dsonar.projectKey=frontend '''
                     }
                 }
             }
         }
-        stage('Quality Check') {
-            steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token' 
-                }
-            }
-        }
+        // stage('Quality Check') {
+        //     steps {
+        //         script {
+        //             waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token' 
+        //         }
+        //     }
+        // }
         // stage('OWASP Dependency-Check Scan') {
         //     steps {
-        //         dir('Application-Code/backend') {
+        //         dir('Application-Code/frontend') {
         //             dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
         //             dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
         //         }
@@ -49,7 +49,7 @@ pipeline {
         // }
         stage('Trivy File Scan') {
             steps {
-                dir('Application-Code/backend') {
+                dir('Application-Code/frontend') {
                     sh 'trivy fs . > trivyfs.txt'
                 }
             }
@@ -57,7 +57,7 @@ pipeline {
         stage("Docker Image Build") {
             steps {
                 script {
-                    dir('Application-Code/backend') {
+                    dir('Application-Code/frontend') {
                             sh 'docker system prune -f'
                             sh 'docker container prune -f'
                             sh 'docker build -t ${AWS_ECR_REPO_NAME} .'
@@ -90,14 +90,14 @@ pipeline {
                 GIT_USER_NAME = "praveen9293"
             }
             steps {
-                dir('Kubernetes-Manifests-file/Backend') {
+                dir('Kubernetes-Manifests-file/Frontend') {
                     withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
                         sh '''
                             git config user.email "praveen.7k9@gmail.com"
                             git config user.name "praveen9293"
                             BUILD_NUMBER=${BUILD_NUMBER}
                             echo $BUILD_NUMBER
-                            imageTag=$(grep -oP '(?<=backend:)[^ ]+' deployment.yaml)
+                            imageTag=$(grep -oP '(?<=frontend:)[^ ]+' deployment.yaml)
                             echo $imageTag
                             sed -i "s/${AWS_ECR_REPO_NAME}:${imageTag}/${AWS_ECR_REPO_NAME}:${BUILD_NUMBER}/" deployment.yaml
                             git add deployment.yaml
